@@ -1,0 +1,98 @@
+{
+  "filepath": "D:/QTprogramma/untitled8/build/debug/world/%1/%2/%3.jpg",
+
+  "data": [
+    {
+      "tiernumber": 0,
+      "resolution": 156543.033928041
+    },
+    {
+      "tiernumber": 1,
+      "resolution": 78271.5169640204
+    },
+    {
+      "tiernumber": 2,
+      "resolution": 39135.7584820102
+    },
+    {
+      "tiernumber": 3,
+      "resolution": 19567.8792410051
+    },
+    {
+      "tiernumber": 4,
+      "resolution": 9783.93962050256
+    },
+    {
+      "tiernumber": 5,
+      "resolution": 4891.96981025128
+    },
+    {
+      "tiernumber": 6,
+      "resolution": 2445.98490512564
+    },
+    {
+      "tiernumber": 7,
+      "resolution": 1222.99245256282
+    },
+    {
+      "tiernumber": 8,
+      "resolution": 611.49622628141
+    },
+    {
+      "tiernumber": 9,
+      "resolution": 305.748113140705
+    },
+    {
+      "tiernumber": 10,
+      "resolution": 152.874056570353
+    },
+    {
+      "tiernumber": 11,
+      "resolution": 76.4370282851763
+    },
+    {
+      "tiernumber": 12,
+      "resolution": 38.2185141425881
+    },
+    {
+      "tiernumber": 13,
+      "resolution": 19.1092570712940
+    },   
+   {
+      "tiernumber": 14,
+      "resolution": 9.5546285356470
+    },
+   {
+      "tiernumber": 15,
+      "resolution": 4.7773142678235
+    },
+   {
+      "tiernumber": 16,
+      "resolution": 2.38865713391175
+    },
+   {
+      "tiernumber": 17,
+      "resolution": 1.1943285669558
+    },
+   {
+      "tiernumber": 18,
+      "resolution": 0.5971642834779
+    },
+   {
+      "tiernumber": 19,
+      "resolution": 0.2985821417389
+    },
+   {
+      "tiernumber": 20,
+      "resolution": 0.1492910708694
+    },
+   {
+      "tiernumber": 21,
+      "resolution": 0.0746455354347
+    },
+   {
+      "tiernumber": 22,
+      "resolution": 0.0373227677173
+    }
+  ]
+}
