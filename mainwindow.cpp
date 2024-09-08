@@ -33,6 +33,9 @@ MainWindow::MainWindow(QWidget *parent)
     ui->label_loc->setText(QString("坐标值：%1,%2")
                            .arg(QString::number(m_longtitude,'f',7)).arg(QString::number(m_latitude,'f',7)));
     ui->label_loc->setAlignment(Qt::AlignLeft);
+
+
+    m_isPointClick = false;  // 默认初始是不按下的
 }
 
 MainWindow::~MainWindow()
@@ -43,7 +46,7 @@ MainWindow::~MainWindow()
 //①、根据坐标展示完整的地图：
 //      中心经纬度——>中心墨菲托坐标——>根据缩放程度取得分辨率，计算左上角墨菲托坐标
 //      ——>计算左上角图片的编号——>计算瓦片数量，绘制完整的地图图片
-QPixmap MainWindow::drawPicture(int height,int width,double longtitude,double latitude)
+QPixmap MainWindow::createMapPicture(int height,int width,double longtitude,double latitude)
 {
     int mapSizeX = width;
     int mapSizeY = height;
@@ -55,20 +58,20 @@ QPixmap MainWindow::drawPicture(int height,int width,double longtitude,double la
 
     // 根据缩放程度取得对应的分辨率，并计算出地图显示区域左上角的墨卡托坐标
     m_resolution = m_configInfo.at(m_zoom).resolution;
-    double mercatorLeftUp_X = mercatorLoc.x - (m_resolution * mapSizeX / 2);
-    double mercatorLeftUp_Y = mercatorLoc.y + (m_resolution * mapSizeY / 2);
+    m_mercatorLeftUpX = mercatorLoc.x - (m_resolution * mapSizeX / 2);
+    m_mercatorLeftUpY = mercatorLoc.y + (m_resolution * mapSizeY / 2);
 
     // 根据左上角墨卡托坐标，计算其对应的瓦片地图编号
-    int leftTopTitleRow = std::floor(qAbs(mercatorLeftUp_X + fullExtendHalf) / m_resolution / tilePix);  // floor向下取整
-    int leftTopTitleCol = std::floor(qAbs(mercatorLeftUp_Y - fullExtendHalf) / m_resolution / tilePix);
+    int leftTopTitleRow = std::floor(qAbs(m_mercatorLeftUpX + fullExtendHalf) / m_resolution / tilePix);  // floor向下取整
+    int leftTopTitleCol = std::floor(qAbs(m_mercatorLeftUpY - fullExtendHalf) / m_resolution / tilePix);
 
     //地理范围
     double realMercatorLeftUp_X = -fullExtendHalf + leftTopTitleRow * tilePix * m_resolution;
     double realMercatorLeftUp_Y = fullExtendHalf - leftTopTitleCol * tilePix * m_resolution;
 
     //左上角偏移像素 下面这两个值是小于零的
-    double offSetX = (realMercatorLeftUp_X - mercatorLeftUp_X) / m_resolution;
-    double offSetY = (mercatorLeftUp_Y - realMercatorLeftUp_Y) / m_resolution;
+    double offSetX = (realMercatorLeftUp_X - m_mercatorLeftUpX) / m_resolution;
+    double offSetY = (m_mercatorLeftUpY - realMercatorLeftUp_Y) / m_resolution;
 
     // 计算瓦片数量
     quint8 xClipnum = std::ceil((mapSizeX + qAbs(offSetX)) / tilePix);
@@ -178,8 +181,8 @@ void MainWindow::mercatorToTileNum(double mercX, double mercY, int zoom, int &ti
     tileY = static_cast<int>(floor((origin - mercY) / worldSize * (1 << zoom)));
 }
 
-// 拼凑出完整的地图
-void MainWindow::showmap()
+// 拼凑出完整的地图图片（瓦片+点线面信息）
+void MainWindow::showPicture()
 {
     QFile file(jsonfile);
     if(!file.open(QIODevice::ReadOnly|QIODevice::Text))
@@ -188,16 +191,53 @@ void MainWindow::showmap()
         return;
     }
 
-    m_pix = drawPicture(ui->label->height(),ui->label->width(),m_longtitude,m_latitude);
+    // 先将瓦片地图拼接起来
+    m_pix = createMapPicture(ui->label->height(),ui->label->width(),m_longtitude,m_latitude);
+
+    // 再将地图上变得点下面绘制到拼接的瓦片地图上
+    integratePicture(m_pix);
+
     ui->label->setPixmap(m_pix);
+}
+
+void MainWindow::integratePicture(QPixmap& m_pix)
+{
+    // 计算图片左上角的墨卡托值，明确图片的显示范围
+    double mercatorRightUpX = m_mercatorLeftUpX + ui->label->width() * m_resolution;
+    double mercatorLeftDownY = m_mercatorLeftUpY - ui->label->height() * m_resolution;
+
+
+    QPainter painter(&m_pix);
+    painter.setBrush(Qt::red); // 设置填充颜色为红色
+
+    // 融合点信息
+    for(std::list<std::pair<Coordinate,Mercator>>::iterator start = m_mapPoint.begin();
+               start != m_mapPoint.end();start++)
+    {
+        // 判断当前点是否在显示的范围内
+        if((*start).second.x >= m_mercatorLeftUpX && (*start).second.x <= mercatorRightUpX
+                && (*start).second.y >= mercatorLeftDownY && (*start).second.y <= m_mercatorLeftUpY)
+        {
+            // 重绘该点，得到这个点的位置，
+            int pos_x = static_cast<int>(((*start).second.x - m_mercatorLeftUpX)/m_resolution);
+            int pos_y = static_cast<int>((m_mercatorLeftUpY - (*start).second.y)/m_resolution);
+
+            painter.drawEllipse(pos_x - 10,pos_y - 10,20,20);
+            ui->label->setPixmap(m_pix);  // 将新的添加了点信息的图片进行显示
+        }
+    }
+
+    // 融合线信息
+
+    // 融合面信息
 }
 
 void MainWindow::resizeEvent(QResizeEvent *event)
 {
     ui->label->setPixmap(QPixmap());   
-    ui->label->setGeometry(ui->label->x(),ui->label->y(),event->size().width() - 50,event->size().height() - 60);
+    ui->label->setGeometry(ui->label->x(),ui->label->y(),event->size().width() - 50,event->size().height() - 120);
     ui->label_loc->setGeometry(event->size().width() - 600,event->size().height() - 40,600,40);
-    showmap();
+    showPicture();
 
     event->ignore();
 }
@@ -221,7 +261,7 @@ void MainWindow::wheelEvent(QWheelEvent *event)
                 m_zoom--;
             }
         }
-        showmap();
+        showPicture();
         m_wheeling = true;
     }
 }
@@ -241,14 +281,17 @@ void MainWindow::movetoNewCenter(double x, double y)
     // qDebug()<<m_longtitude<<"   "<<m_latitude;
 }
 
-// 鼠标移动槽函数
+// 鼠标移动槽函数  如果只是鼠标按下 没有滑动鼠标 不会进到这个槽函数中
 void MainWindow::mouseMoveEvent(QMouseEvent *event)
 {
     if(event->buttons() & Qt::LeftButton)
     {
-        movetoNewCenter(m_lastMousePos.x() - event->x(),m_lastMousePos.y() - event->y());
-        showmap();
-        m_lastMousePos = event->pos();
+        if(!m_isPointClick)   // 点的按钮没有拿下，此时可以移动地图
+        {
+            movetoNewCenter(m_lastMousePos.x() - event->x(),m_lastMousePos.y() - event->y());
+            showPicture();
+            m_lastMousePos = event->pos();
+        }
     }
     else
     {
@@ -270,10 +313,10 @@ std::pair<double,double> MainWindow::getMouseLocByMidPoint(double offsetX,double
 {
     // 当前中心点的墨卡托坐标
     Mercator cpm = lonlatTomercator(m_longtitude,m_latitude);
-    cpm.x = cpm.x - offsetX * m_resolution;
-    cpm.y = cpm.y - offsetY * m_resolution;
+    m_mouseMercator.x = cpm.x - offsetX * m_resolution;
+    m_mouseMercator.y = cpm.y + offsetY * m_resolution;
 
-    return mercatorTolonlat(cpm);
+    return mercatorTolonlat(m_mouseMercator);
 }
 
 // 鼠标释放槽函数
@@ -287,6 +330,24 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event)
 void MainWindow::mousePressEvent(QMouseEvent *event)
 {
     m_lastMousePos = event->pos();
+    if(m_isPointClick)  // 点按钮点下了，此时需要将点信息增加进来
+    {
+        Coordinate loc;
+        loc.longtitude = m_mouseLoc.first;
+        loc.latitude = m_mouseLoc.second;
+        m_mapPoint.push_back(std::make_pair(loc,m_mouseMercator));  // 将经纬度和墨卡托值存储
+
+        QPainter painter(&m_pix);
+        painter.setBrush(Qt::red); // 设置填充颜色为红色
+        painter.drawEllipse(m_lastMousePos.x() - ui->label->x() - 10,m_lastMousePos.y() -ui->label->y() - 10,20,20);
+        ui->label->setPixmap(m_pix);  // 将新的添加了点信息的图片进行显示
+    }
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    Q_UNUSED(event);
+    QMessageBox::critical(nullptr, "提示","关闭窗口");
 }
 
 // 墨卡托坐标转换经纬度
@@ -299,3 +360,33 @@ std::pair<double,double> MainWindow::mercatorTolonlat(Mercator mercator)
     return std::make_pair(longtitude,latitude);
 }
 
+
+void MainWindow::on_pushButton_point_clicked()
+{
+    if(!m_isPointClick)
+    {
+        ui->pushButton_point->setStyleSheet(    "QPushButton {"
+                                                "    background-color: gray;"
+                                                "    border: 1px solid gray;"
+                                                "    padding: 5px;"
+                                                "}"
+                                                "QPushButton:pressed {"
+                                                "    background-color: red;"  // 按下时按钮背景变为红色
+                                                "    border: 1px solid darkred;"
+                                                "}");
+        m_isPointClick = true;
+    }
+    else
+    {
+        ui->pushButton_point->setStyleSheet(    "QPushButton {"
+                                                "    background-color: white;"
+                                                "    border: 1px solid gray;"
+                                                "    padding: 5px;"
+                                                "}"
+                                                "QPushButton:pressed {"
+                                                "    background-color: red;"  // 按下时按钮背景变为红色
+                                                "    border: 1px solid darkred;"
+                                                "}");
+        m_isPointClick = false;
+    }
+}

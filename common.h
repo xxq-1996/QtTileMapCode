@@ -9,6 +9,12 @@ typedef struct _MERCATOR_
     double y;
 }Mercator;
 
+typedef struct _COORDINATE_
+{
+    double longtitude;
+    double latitude;
+}Coordinate;
+
 // 配置文件参数
 typedef struct _TIERPARAM_
 {
